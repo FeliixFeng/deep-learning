@@ -1,9 +1,14 @@
 """
-    ANN (Artificial Neural Network) for Phone Price Classification
+    ANN (Artificial Neural Network) for Phone Price Classification - Optimized
     Task: Predict phone price range based on 20 features
     Dataset: train.csv (phone specifications and price ranges)
 
-
+    Optimizations applied:
+    1. Optimizer: SGD -> Adam
+    2. Learning rate: 1e-3 -> 1e-4
+    3. Data standardization
+    4. Deeper network (more parameters)
+    5. Adjusted training epochs
 """
 
 import torch
@@ -12,6 +17,7 @@ from torch.utils.data import TensorDataset
 import torch.nn as nn
 import torch.optim as optim
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -26,45 +32,60 @@ def create_dataset():
     1. Load CSV data
     2. Split features (X) and labels (Y)
     3. Train/test split (80%/20%)
-    4. Convert to PyTorch tensors
+    4. Standardize features
+    5. Convert to PyTorch tensors
     """
-    # Load CSV dataset
+    # 1. Load CSV dataset
     data = pd.read_csv('./data/train.csv')
 
-    # Split features and labels
+    # 2. Split features and labels
     x, y = data.iloc[:, :-1], data.iloc[:, -1]
 
-    # Convert features to float32 for PyTorch
+    # 3. Convert features to float32 for PyTorch
     x = x.astype(np.float32)
 
-    # Train/test split with stratification
+    # 4. Train/test split with stratification
     x_train, x_test, y_train, y_test = train_test_split(
         x, y, test_size=0.2, random_state=3, stratify=y
     )
 
-    # Convert to PyTorch tensors and create datasets
-    train_dataset = TensorDataset(torch.tensor(x_train.values), torch.tensor(y_train.values))
-    test_dataset = TensorDataset(torch.tensor(x_test.values), torch.tensor(y_test.values))
+    # 5. Standardize features (optimization ①)
+    transfer = StandardScaler()
+    x_train = transfer.fit_transform(x_train)
+    x_test = transfer.transform(x_test)
 
-    # Return datasets and dimensions
+    # 6. Convert to PyTorch tensors and create datasets
+    train_dataset = TensorDataset(torch.tensor(x_train), torch.tensor(y_train.values))
+    test_dataset = TensorDataset(torch.tensor(x_test), torch.tensor(y_test.values))
+
+    # 7. Return datasets and dimensions
     return train_dataset, test_dataset, x_test.shape[1], len(np.unique(y))
 
 
 class PhonePriceModel(nn.Module):
     """
-    Neural Network Architecture:
-    Input(20) -> Linear(128) -> ReLU -> Linear(256) -> ReLU -> Linear(output) -> Output
+    Neural Network Architecture (Deep):
+    Input(20) -> Linear(128) -> ReLU -> Linear(256) -> ReLU -> Linear(512) -> ReLU -> Linear(128) -> ReLU -> Linear(output)
     """
     def __init__(self, input_dim, output_dim):
-        super().__init__()
-        self.linear1 = nn.Linear(input_dim, 128)   # Hidden layer 1
-        self.linear2 = nn.Linear(128, 256)          # Hidden layer 2
-        self.output = nn.Linear(256, output_dim)    # Output layer
+        super(PhonePriceModel, self).__init__()
+        # 1. Hidden layer 1: input_dim -> 128
+        self.linear1 = nn.Linear(input_dim, 128)
+        # 2. Hidden layer 2: 128 -> 256
+        self.linear2 = nn.Linear(128, 256)
+        # 3. Hidden layer 3: 256 -> 512
+        self.linear3 = nn.Linear(256, 512)
+        # 4. Hidden layer 4: 512 -> 128
+        self.linear4 = nn.Linear(512, 128)
+        # 5. Output layer: 128 -> output_dim
+        self.linear5 = nn.Linear(128, output_dim)
 
     def forward(self, x):
-        x = torch.relu(self.linear1(x))  # Hidden 1 + ReLU
-        x = torch.relu(self.linear2(x))  # Hidden 2 + ReLU
-        x = self.output(x)               # Output (no activation, use CrossEntropyLoss)
+        x = torch.relu(self.linear1(x))  # Layer 1 + ReLU
+        x = torch.relu(self.linear2(x))  # Layer 2 + ReLU
+        x = torch.relu(self.linear3(x))  # Layer 3 + ReLU
+        x = torch.relu(self.linear4(x))  # Layer 4 + ReLU
+        x = self.linear5(x)              # Output (no activation, use CrossEntropyLoss)
         return x
 
 
@@ -85,8 +106,8 @@ def train(train_dataset, input_dim, output_dim):
     # Loss function: CrossEntropyLoss (includes softmax)
     criterion = nn.CrossEntropyLoss()
 
-    # Optimizer: Stochastic Gradient Descent
-    optimizer = optim.SGD(model.parameters(), lr=0.001)
+    # Optimizer: Adam (optimization ③), learning rate 1e-4 (optimization ④)
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
     # Training loop
     epochs = 50
@@ -136,9 +157,9 @@ def evaluate(test_dataset, input_dim, output_dim):
         y_pred = torch.argmax(y_pred, dim=1)  # Get class with the highest probability
         correct += (y_pred == y).sum()  # Count correct predictions
 
-    # 4. Print accuracy
-    accuracy = correct / len(test_dataset)
-    print(f"Accuracy: {accuracy:.4f}")
+    # 4. Print accuracy (percentage)
+    accuracy = correct / len(test_dataset) * 100
+    print(f"Accuracy: {accuracy:.2f}%")
 
 
 
@@ -147,7 +168,7 @@ if __name__ == '__main__':
     train_dataset, test_dataset, input_dim, output_dim = create_dataset()
 
     # 2. Train model (uncomment to run)
-    # train(train_dataset, input_dim, output_dim)
+    train(train_dataset, input_dim, output_dim)
 
     # 3. Evaluate model
     evaluate(test_dataset, input_dim, output_dim)
