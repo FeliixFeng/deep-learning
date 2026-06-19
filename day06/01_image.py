@@ -156,10 +156,20 @@ def dm05_practice():
 
 
 def dm():
+    """
+    Read and display image from file
+    - plt.imread() returns numpy array (HWC format)
+    - Shape: (height, width, channels) for RGB
+    """
+    # Read image (returns HWC format: Height, Width, Channels)
     img1 = plt.imread('./data/img.jpg')
-    print(f'img1:{img1}')
+    print(f'Image shape: {img1.shape}')  # (H, W, C)
+    print(f'Data type: {img1.dtype}')
+    print(f'Pixel range: [{img1.min()}, {img1.max()}]')
 
+    # Display image
     plt.imshow(img1)
+    plt.title('Original Image')
     plt.show()
 
 
